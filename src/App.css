@@ -1,0 +1,273 @@
+.app-shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+  display: grid;
+  gap: 24px;
+}
+
+.hero-panel,
+.panel {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.3);
+  backdrop-filter: blur(16px);
+}
+
+.hero-panel {
+  padding: 32px;
+  display: grid;
+  gap: 20px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-panel h1,
+.panel h2,
+.panel h3 {
+  margin: 0;
+  color: #f8fafc;
+}
+
+.hero-panel h1 {
+  margin-top: 16px;
+  font-size: clamp(2.5rem, 4vw, 4rem);
+  line-height: 1.05;
+}
+
+.lede,
+.panel p,
+.muted,
+.detail-list,
+.log-list,
+.note-list,
+.facts-grid dd {
+  color: #cbd5e1;
+}
+
+.lede {
+  max-width: 58rem;
+  margin-top: 12px;
+  font-size: 1.05rem;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.status-pill,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.status-pill {
+  padding: 10px 14px;
+}
+
+.status-pill-positive {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.status-pill-muted {
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+}
+
+.panel {
+  padding: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.section-header p {
+  margin-top: 8px;
+}
+
+.secondary-button,
+.action-button {
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(15, 23, 42, 0.95));
+  color: #f8fafc;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.secondary-button:hover,
+.action-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+.secondary-button {
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.action-button {
+  padding: 16px 14px;
+  font: inherit;
+  text-align: left;
+}
+
+.cards-grid,
+.details-grid,
+.tips-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.cards-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.details-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.badge {
+  padding: 8px 12px;
+  text-transform: capitalize;
+}
+
+.badge-supported {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.badge-partial {
+  background: rgba(250, 204, 21, 0.18);
+  color: #fde68a;
+}
+
+.badge-unsupported {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fca5a5;
+}
+
+.card-summary {
+  margin: 0;
+}
+
+.detail-list,
+.log-list,
+.note-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.facts-grid {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.fact-row {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.fact-row dt {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.fact-row dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.tips-panel p {
+  margin: 0;
+}
+
+.tips-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    width: min(100%, calc(100% - 20px));
+    padding: 20px 0 32px;
+    gap: 20px;
+  }
+
+  .hero-panel,
+  .panel {
+    border-radius: 20px;
+  }
+
+  .hero-panel,
+  .panel {
+    padding: 20px;
+  }
+
+  .section-header,
+  .card-header {
+    flex-direction: column;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fact-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fact-row dd {
+    text-align: left;
+  }
+}
