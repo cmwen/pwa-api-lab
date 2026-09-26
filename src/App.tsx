@@ -31,6 +31,15 @@ type NavigatorWithExtras = Navigator & {
   wakeLock?: {
     request: (type: 'screen') => Promise<WakeLockSentinel>
   }
+  contacts?: {
+    select: (properties: string[], options?: { multiple?: boolean }) => Promise<Array<Record<string, string[]>>>
+    getProperties: () => Promise<string[]>
+  }
+  gpu?: { requestAdapter: () => Promise<{ info?: { vendor?: string; architecture?: string }; features: Set<string> } | null> }
+}
+
+type WindowWithNavigation = Window & {
+  navigation?: { entries: () => Array<unknown>; currentEntry?: { key?: string; index?: number }; navigate: (url: string, options?: { history?: 'push' | 'replace' }) => unknown }
 }
 
 type ServiceWorkerRegistrationWithExtras = ServiceWorkerRegistration & {
@@ -105,6 +114,25 @@ type CapabilityCard = {
   status: SupportStatus
 }
 
+type RecognitionAlternative = { transcript: string }
+type RecognitionResult = { 0: RecognitionAlternative; isFinal: boolean }
+type RecognitionEvent = Event & { resultIndex: number; results: ArrayLike<RecognitionResult> }
+type RecognitionErrorEvent = Event & { error: string; message?: string }
+type SpeechRecognitionLike = EventTarget & {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((event: RecognitionEvent) => void) | null
+  onerror: ((event: RecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike
+}
+
 const BASE_ASSET_URL = `${import.meta.env.BASE_URL}app-icon.svg`
 const NOT_AVAILABLE = 'Not available'
 
@@ -159,6 +187,15 @@ function App() {
   ])
   const [installOutcome, setInstallOutcome] = useState('Not attempted')
   const [launchedFiles, setLaunchedFiles] = useState(0)
+  const [transcript, setTranscript] = useState('')
+  const [recognitionState, setRecognitionState] = useState('Ready')
+  const [speechText, setSpeechText] = useState('Hello from the PWA API Lab. Text to speech is working.')
+  const [speechVoices, setSpeechVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [selectedVoice, setSelectedVoice] = useState('')
+  const [recognition, setRecognition] = useState<SpeechRecognitionLike | null>(null)
+  const [navigationResult, setNavigationResult] = useState('Not tested')
+  const [gpuResult, setGpuResult] = useState('Not tested')
+  const [contactResult, setContactResult] = useState('Not tested')
 
   const addLog = useCallback((message: string) => {
     setEventLog((current) => [`${formatTime()} ${message}`, ...current].slice(0, 10))
@@ -333,6 +370,19 @@ function App() {
       connection?.removeEventListener?.('change', handleRefresh)
     }
   }, [addLog, refreshSnapshot])
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return
+    const updateVoices = () => setSpeechVoices(window.speechSynthesis.getVoices())
+    updateVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', updateVoices)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', updateVoices)
+  }, [])
+
+  useEffect(() => () => {
+    recognition?.stop()
+    window.speechSynthesis?.cancel()
+  }, [recognition])
 
   useEffect(() => {
     if (!wakeLockSentinel) {
@@ -669,6 +719,127 @@ function App() {
     addLog('Vibration pattern requested.')
   }, [addLog])
 
+  const handleStartRecognition = useCallback(() => {
+    const SpeechRecognition = (window as SpeechWindow).SpeechRecognition ??
+      (window as SpeechWindow).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setRecognitionState('Unsupported')
+      addLog('Speech recognition is not exposed by this browser.')
+      return
+    }
+    if (recognition) {
+      recognition.stop()
+      return
+    }
+    const instance = new SpeechRecognition()
+    instance.lang = navigator.language || 'en-US'
+    instance.continuous = true
+    instance.interimResults = true
+    instance.onresult = (event) => {
+      let text = ''
+      for (let i = 0; i < event.results.length; i += 1) text += event.results[i][0].transcript
+      setTranscript(text)
+    }
+    instance.onerror = (event) => {
+      setRecognitionState(`Error: ${event.error}${event.message ? ` — ${event.message}` : ''}`)
+      addLog(`Speech recognition error: ${event.error}.`)
+      setRecognition(null)
+    }
+    instance.onend = () => {
+      setRecognition(null)
+      setRecognitionState('Stopped')
+    }
+    try {
+      instance.start()
+      setRecognition(instance)
+      setRecognitionState('Listening')
+      addLog(`Speech recognition started (${instance.lang}).`)
+    } catch (error) {
+      setRecognitionState(`Error: ${formatError(error)}`)
+      addLog(`Could not start speech recognition: ${formatError(error)}.`)
+    }
+  }, [addLog, recognition])
+
+  const handleSpeak = useCallback(() => {
+    if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+      addLog('Speech synthesis is not supported in this browser.')
+      return
+    }
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(speechText)
+    utterance.lang = navigator.language || 'en-US'
+    utterance.rate = 1
+    utterance.onstart = () => addLog('Text-to-speech playback started.')
+    utterance.onend = () => addLog('Text-to-speech playback finished.')
+    utterance.onerror = (event) => addLog(`Text-to-speech error: ${event.error}.`)
+    if (selectedVoice) utterance.voice = speechVoices.find((voice) => voice.voiceURI === selectedVoice) ?? null
+    window.speechSynthesis.speak(utterance)
+  }, [addLog, selectedVoice, speechText, speechVoices])
+
+  const handleTestNavigation = useCallback(() => {
+    const api = (window as WindowWithNavigation).navigation
+    if (!api) {
+      setNavigationResult('Unsupported')
+      addLog('Navigation API is not exposed by this browser.')
+      return
+    }
+    try {
+      const url = new URL(window.location.href)
+      url.hash = `navigation-api-test-${Date.now()}`
+      api.navigate(url.href)
+      setNavigationResult(`Available; navigation requested (${api.entries().length} history entries).`)
+      addLog('Navigation API same-page navigation requested.')
+    } catch (error) {
+      setNavigationResult(`Error: ${formatError(error)}`)
+      addLog(`Navigation API test failed: ${formatError(error)}.`)
+    }
+  }, [addLog])
+
+  const handleTestWebGpu = useCallback(async () => {
+    const gpu = (navigator as NavigatorWithExtras).gpu
+    if (!gpu) {
+      setGpuResult('WebGPU API unsupported')
+      addLog('WebGPU is not exposed by this browser.')
+      return
+    }
+    try {
+      const adapter = await gpu.requestAdapter()
+      if (!adapter) {
+        setGpuResult('API present; no GPU adapter available')
+      } else {
+        const info = adapter.info
+        setGpuResult(`Adapter available${info?.vendor ? ` — ${info.vendor}` : ''}${info?.architecture ? ` / ${info.architecture}` : ''}; ${adapter.features.size} optional features.`)
+      }
+      addLog(`WebGPU probe: ${adapter ? 'adapter available' : 'no adapter returned'}.`)
+    } catch (error) {
+      setGpuResult(`Request failed: ${formatError(error)}`)
+      addLog(`WebGPU adapter request failed: ${formatError(error)}.`)
+    }
+  }, [addLog])
+
+  const handlePickContact = useCallback(async () => {
+    const contacts = (navigator as NavigatorWithExtras).contacts
+    if (!contacts) {
+      setContactResult('Contact Picker unsupported')
+      addLog('Contact Picker API is not exposed by this browser.')
+      return
+    }
+    try {
+      const properties = await contacts.getProperties()
+      const requested = ['name', 'email', 'tel'].filter((property) => properties.includes(property))
+      if (requested.length === 0) {
+        setContactResult('Picker available; no supported name, email, or telephone fields.')
+        return
+      }
+      const selected = await contacts.select(requested, { multiple: false })
+      setContactResult(selected.length ? `User selected ${selected.length} contact. Available fields: ${requested.join(', ')}.` : 'No contact selected.')
+      addLog(selected.length ? 'Contact Picker returned a selected contact.' : 'Contact Picker was cancelled.')
+    } catch (error) {
+      setContactResult(`Picker closed or failed: ${formatError(error)}`)
+      addLog(`Contact Picker result: ${formatError(error)}.`)
+    }
+  }, [addLog])
+
   const handleRegisterSync = useCallback(async () => {
     const registration = await getServiceWorkerRegistration()
     if (!registration?.sync) {
@@ -768,6 +939,61 @@ function App() {
             label="Lock landscape orientation"
             onClick={() => void handleLockOrientation('landscape')}
           />
+        </div>
+      </section>
+
+      <section className="panel speech-panel">
+        <div className="section-header"><div><h2>Speech APIs</h2><p>Test speech recognition (audio to text) and speech synthesis (text to audio) on this device.</p></div></div>
+        <div className="speech-grid">
+          <div className="speech-test">
+            <h3>Audio to text</h3>
+            <p className="muted">Status: {recognitionState}. Microphone permission is requested when you start.</p>
+            <p className="muted">Recognition may require internet access and may send audio to a browser vendor’s service. Browser support and language availability vary.</p>
+            <div className="speech-actions">
+              <ActionButton label={recognition ? 'Stop listening' : 'Start listening'} onClick={handleStartRecognition} />
+              <ActionButton label="Clear transcript" onClick={() => setTranscript('')} />
+            </div>
+            <textarea aria-label="Speech recognition transcript" readOnly value={transcript} placeholder="Your recognized words will appear here." />
+          </div>
+          <div className="speech-test">
+            <h3>Text to speech</h3>
+            <textarea aria-label="Text to speak" value={speechText} onChange={(event) => setSpeechText(event.target.value)} />
+            <label className="voice-label">Voice
+              <select aria-label="Speech synthesis voice" value={selectedVoice} onChange={(event) => setSelectedVoice(event.target.value)}>
+                <option value="">Default voice ({navigator.language})</option>
+                {speechVoices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang}){voice.default ? ' — default' : ''}</option>)}
+              </select>
+            </label>
+            <div className="speech-actions">
+              <ActionButton label="Speak" onClick={handleSpeak} />
+              <ActionButton label="Stop speech" onClick={() => { window.speechSynthesis?.cancel(); addLog('Text-to-speech playback stopped.') }} />
+            </div>
+            <p className="muted">{speechVoices.length} voices reported by this browser/device.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-header"><div><h2>Newer and device-specific APIs</h2><p>Run each probe explicitly. Contact Picker opens the browser’s native selection UI.</p></div></div>
+        <div className="speech-grid">
+          <div className="speech-test">
+            <h3>Navigation API</h3>
+            <p className="muted">Tests API presence and requests a same-page navigation to a unique fragment.</p>
+            <ActionButton label="Test Navigation API" onClick={handleTestNavigation} />
+            <p role="status">{navigationResult}</p>
+          </div>
+          <div className="speech-test">
+            <h3>WebGPU</h3>
+            <p className="muted">Requests a GPU adapter. Hardware, driver, browser policy, or power settings may prevent one from being returned.</p>
+            <ActionButton label="Request WebGPU adapter" onClick={() => void handleTestWebGpu()} />
+            <p role="status">{gpuResult}</p>
+          </div>
+          <div className="speech-test">
+            <h3>Contact Picker</h3>
+            <p className="muted">Requires a supported browser and a user action. The app requests only name, email, and telephone fields supported by the browser.</p>
+            <ActionButton label="Pick a contact" onClick={() => void handlePickContact()} />
+            <p role="status">{contactResult}</p>
+          </div>
         </div>
       </section>
 
